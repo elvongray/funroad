@@ -6,7 +6,6 @@
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../src/generated/prisma"
 }
 
 datasource db {
@@ -15,28 +14,105 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-model Post {
-  id        Int      @id @default(autoincrement())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  title     String   @db.VarChar(255)
-  content   String?
-  published Boolean  @default(false)
-  author    User     @relation(fields: [authorId], references: [id])
-  authorId  Int
+// NextAuth.js models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
 }
 
-model Profile {
-  id     Int     @id @default(autoincrement())
-  bio    String?
-  user   User    @relation(fields: [userId], references: [id])
-  userId Int     @unique
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model User {
-  id      Int      @id @default(autoincrement())
-  email   String   @unique
-  name    String?
-  posts   Post[]
-  profile Profile?
+  id             String   @id @default(cuid())
+  name           String?
+  username       String?  @unique
+  email          String?  @unique
+  emailVerified  Boolean? @default(false) // For email verification
+  image          String?
+  hashedPassword String? // For email/password login
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  accounts Account[]
+  sessions Session[]
+
+  // Custom fields for your app
+  stripeAccountId String? @unique // Stores the connected Stripe Standard account ID for Creators
+  creatorName     String? @unique // For the subpath URL: yourplatform.com/creatorName
+
+  products  Product[] // Products created by this user (if they are a creator)
+  purchases Purchase[] // Products purchased by this user (if they are a customer)
+  comments  Comment[] // Comments made by this user
+}
+
+// Add your other models as you progress, for now just User, Account, Session
+model Product {
+  id              String   @id @default(cuid())
+  name            String
+  description     String   @db.Text
+  price           Decimal  @db.Decimal(10, 2) // Precision and scale
+  displayImageUrl String   @db.Text
+  digitalFileUrl  String   @db.Text // Private S3 URL
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  creatorId       String // Link to the User who created it
+  categoryId      String // Link to the Category
+
+  creator   User       @relation(fields: [creatorId], references: [id])
+  category  Category   @relation(fields: [categoryId], references: [id])
+  purchases Purchase[]
+  comments  Comment[]
+}
+
+model Category {
+  id       String    @id @default(cuid())
+  name     String    @unique
+  products Product[]
+}
+
+model Purchase {
+  id                      String  @id @default(cuid())
+  userId                  String
+  productId               String
+  creatorId               String // Denormalized for easier query
+  amountPaid              Decimal @db.Decimal(10, 2)
+  stripeCheckoutSessionId String  @unique
+  stripePaymentIntentId   String? // Nullable if not always available or needed
+
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+}
+
+model Comment {
+  id            String   @id @default(cuid())
+  productId     String
+  userId        String
+  content       String   @db.Text
+  createdAt     DateTime @default(now())
+  numberOfLikes Int      @default(0) // Limit likes to prevent abuse
+
+  product Product @relation(fields: [productId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
 }
