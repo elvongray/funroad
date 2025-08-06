@@ -1,7 +1,7 @@
 // app/api/auth/[...nextauth]/route.ts (App Router)
 // or pages/api/auth/[...nextauth].ts (Pages Router - adjust imports)
 
-import NextAuth from 'next-auth';
+import NextAuth, { SessionStrategy } from 'next-auth';
 import { PrismaAdapter } from '@auth/prisma-adapter';
 import GoogleProvider from 'next-auth/providers/google';
 import GitHubProvider from 'next-auth/providers/github';
@@ -13,7 +13,9 @@ import { ZodError } from 'zod';
 
 const prisma = new PrismaClient();
 const signInSchema = z.object({
-  email: z.email('Email is required'),
+  email: z.email({
+    message: 'Invalid email address',
+  }),
   password: z
     .string('Password is required')
     .min(8, 'Password must be at least 8 characters'),
@@ -80,11 +82,11 @@ export const authOptions = {
     }),
   ],
   session: {
-    strategy: 'jwt', // Use JWT for session management
+    strategy: 'jwt' as SessionStrategy, // Use JWT for session management
   },
   secret: process.env.NEXTAUTH_SECRET,
   pages: {
-    signIn: '/auth/signin', // Custom sign-in page (you'll create this later)
+    signIn: '/signin', // Custom sign-in page (you'll create this later)
     // You can add more custom pages like signOut, error, verifyRequest
   },
   callbacks: {
